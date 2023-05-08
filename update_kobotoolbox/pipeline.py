@@ -248,13 +248,29 @@ def get_survey_geodata(df: pd.DataFrame) -> gpd.GeoDataFrame:
     required=True,
 )
 @parameter(
+    "postgres_table",
+    name="Database table",
+    help="Target table in the workspace database",
+    type=str,
+    required=False,
+)
+@parameter(
+    "postgis_table",
+    name="Database geo-enabled table",
+    help="Target PostGIS table in the workspace",
+    type=str,
+    required=False,
+)
+@parameter(
     "anonymize",
     name="Anonymize data",
     help="Do not extract personal information",
     type=bool,
     default=True,
 )
-def update_geonode(survey_name: str, anonymize: bool):
+def update_geonode(
+    survey_name: str, postgres_table: str, postgis_table: str, anonymize: bool
+):
     """Update Geonode source data for a given survey."""
     api = Api()
     current_run.log_info(
@@ -275,7 +291,10 @@ def update_geonode(survey_name: str, anonymize: bool):
         columns = [col for col in data.columns if not col.startswith("ID")]
         data = data[columns]
 
-    extract_geodata(data, output_dir, survey_name)
+    geodata = extract_geodata(data, output_dir, survey_name)
+
+    if postgres_table and postgis_table:
+        push_to_database(data, geodata, postgres_table, postgis_table, overwrite=True)
 
 
 @update_geonode.task
@@ -311,7 +330,7 @@ def extract_geodata(data: pd.DataFrame, output_dir: str, survey_name: str):
     geodata.to_file(fpath, driver="GPKG")
     current_run.add_file_output(fpath)
     current_run.log_info(f"Written survey geodata into {fpath}")
-    return
+    return geodata
 
 
 @update_geonode.task
