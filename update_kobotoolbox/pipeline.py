@@ -5,6 +5,7 @@ from typing import List
 import geopandas as gpd
 import pandas as pd
 import requests
+from sqlalchemy import create_engine
 from openhexa.sdk import current_run, parameter, pipeline, workspace
 from shapely.geometry import Point
 
@@ -269,6 +270,11 @@ def update_geonode(survey_name: str, anonymize: bool):
 
     extract_fields_metadata(api, survey_name, survey_uid, output_dir)
     data = extract_data(api, survey_name, survey_uid, output_dir)
+
+    if anonymize:
+        columns = [col for col in data.columns if not col.startswith("ID")]
+        data = data[columns]
+
     extract_geodata(data, output_dir, survey_name)
 
 
@@ -305,6 +311,22 @@ def extract_geodata(data: pd.DataFrame, output_dir: str, survey_name: str):
     current_run.add_file_output(fpath)
     current_run.log_info(f"Written survey geodata into {fpath}")
     return
+
+
+@update_geonode.task
+def push_to_database(
+    df: pd.DataFrame,
+    geodf: gpd.GeoDataFrame,
+    postgres_table: str,
+    postgis_table: str,
+    overwrite: bool,
+):
+    engine = create_engine(workspace.database_url)
+    if_exists = "replace" if overwrite else "fail"
+    df.to_sql(postgres_table, engine, if_exists=if_exists)
+    current_run.log_info(f"Pushed data to database table {postgres_table}")
+    geodf.to_postgis(postgis_table, engine, if_exists=if_exists)
+    current_run.log_info(f"Pushed geodata to database table {postgis_table}")
 
 
 if __name__ == "__main__":
