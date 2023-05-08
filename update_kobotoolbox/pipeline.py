@@ -295,6 +295,7 @@ def extract_fields_metadata(
 def extract_data(api: Api, survey_name: str, survey_uid: str, output_dir: str):
     current_run.log_info(f"Extracting data for survey {survey_name}")
     data = get_survey_data(api, survey_uid)
+    current_run.log_error(f"No data found in survey {survey_name}")
     fpath = os.path.join(output_dir, "survey_data.csv")
     data.to_csv(fpath, index=False)
     current_run.add_file_output(fpath)
