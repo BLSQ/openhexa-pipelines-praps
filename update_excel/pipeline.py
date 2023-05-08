@@ -1,22 +1,16 @@
-from openhexa.sdk import current_run, pipeline
+from openhexa.sdk import current_run, pipeline, parameter
 
 
 @pipeline("update-excel", name="Update Excel")
+@parameter(
+    "data_directory",
+    name="Data directory",
+    help="Source directory with Excel sheets",
+    type=str,
+    required=True,
+)
 def update_excel():
-    count = task_1()
-    task_2(count)
-
-
-@update_excel.task
-def task_1():
-    current_run.log_info("In task 1...")
-
-    return 42
-
-
-@update_excel.task
-def task_2(count):
-    current_run.log_info(f"In task 2... count is {count}")
+    current_run.log_info("Extracting survey data from Excel sheets")
 
 
 if __name__ == "__main__":
