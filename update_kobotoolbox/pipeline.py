@@ -273,10 +273,10 @@ def update_geonode(
 ):
     """Update Geonode source data for a given survey."""
     api = Api()
-    current_run.log_info(
-        f"Connecting to KoboToolbox instance {os.getenv('KOBO_API_URL')}..."
-    )
     api.authenticate(os.getenv("KOBO_API_TOKEN"))
+    current_run.log_info(
+        f"Connected to KoboToolbox instance {os.getenv('KOBO_API_URL')}..."
+    )
     survey_uid = SURVEYS[survey_name]
 
     timestring = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%f")
@@ -288,8 +288,7 @@ def update_geonode(
     data = extract_data(api, survey_name, survey_uid, output_dir)
 
     if anonymize:
-        columns = [col for col in data.columns if not col.startswith("ID")]
-        data = data[columns]
+        data = anonymize_data(data)
 
     geodata = extract_geodata(data, output_dir, survey_name)
 
@@ -314,7 +313,8 @@ def extract_fields_metadata(
 def extract_data(api: Api, survey_name: str, survey_uid: str, output_dir: str):
     current_run.log_info(f"Extracting data for survey {survey_name}")
     data = get_survey_data(api, survey_uid)
-    current_run.log_error(f"No data found in survey {survey_name}")
+    if not len(data):
+        current_run.log_error(f"No data found in survey {survey_name}")
     fpath = os.path.join(output_dir, "survey_data.csv")
     data.to_csv(fpath, index=False)
     current_run.add_file_output(fpath)
@@ -331,6 +331,13 @@ def extract_geodata(data: pd.DataFrame, output_dir: str, survey_name: str):
     current_run.add_file_output(fpath)
     current_run.log_info(f"Written survey geodata into {fpath}")
     return geodata
+
+
+@update_geonode.task
+def anonymize_data(data: pd.DataFrame):
+    columns = [col for col in data.columns if not col.startswith("ID")]
+    data = data[columns]
+    return data
 
 
 @update_geonode.task
